@@ -8,7 +8,7 @@ namespace DotNetCampus.Logging;
 /// <summary>
 /// 辅助创建日志记录器的构建器。
 /// </summary>
-public sealed class LoggerBuilder
+public class LoggerBuilder
 {
     private LogOptions? _options;
     private readonly List<ILogger> _writers = [];
@@ -54,7 +54,7 @@ public sealed class LoggerBuilder
         return this;
     }
 
-    public LoggerBuilder<CompositeLogger> Build()
+    public virtual LoggerBuilder<CompositeLogger> Build()
     {
         var logger = new CompositeLogger(_options ?? new LogOptions())
         {
