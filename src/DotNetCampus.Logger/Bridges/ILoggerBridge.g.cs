@@ -10,6 +10,11 @@ namespace DotNetCampus.Logging.Bridges;
 /// </summary>
 internal interface ILoggerBridge
 {
+    /// <summary>
+    /// 确定指定的日志级别是否已启用。
+    /// </summary>
+    /// <param name="logLevel">要检查的日志级别。</param>
+    /// <returns>如果启用该级别，则为 <see langword="true"/>；否则为 <see langword="false"/>。</returns>
     bool IsEnabled(int logLevel)
 #if NETCOREAPP3_0_OR_GREATER
         => true
