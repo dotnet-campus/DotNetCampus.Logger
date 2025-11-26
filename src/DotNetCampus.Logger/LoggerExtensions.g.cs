@@ -69,7 +69,7 @@ public static class LoggerExtensions
     /// <param name="exception">如果有异常信息，可以传入此参数。</param>
     public static void Error(this ILogger logger, string message, Exception? exception = null)
     {
-        logger.Log(LogLevel.Warning, default, message, null, (s, ex) => message);
+        logger.Log(LogLevel.Error, default, message, null, (s, ex) => message);
     }
 
     /// <summary>
