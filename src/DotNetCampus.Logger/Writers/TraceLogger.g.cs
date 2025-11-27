@@ -9,6 +9,7 @@ namespace DotNetCampus.Logging.Writers;
 /// </summary>
 public class TraceLogger(ILogger realLogger) : ILogger
 {
+    /// <inheritdoc />
     public bool IsEnabled(LogLevel logLevel) => true;
 
     /// <inheritdoc />
