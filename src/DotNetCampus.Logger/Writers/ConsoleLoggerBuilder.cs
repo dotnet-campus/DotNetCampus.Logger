@@ -1,5 +1,5 @@
 ﻿using System;
-using DotNetCampus.Logging.Writers.Helpers;
+using System.Collections.Generic;
 
 namespace DotNetCampus.Logging.Writers;
 
@@ -8,8 +8,9 @@ namespace DotNetCampus.Logging.Writers;
 /// </summary>
 public sealed class ConsoleLoggerBuilder
 {
-    private TagFilterManager? _tagFilterManager;
-    private ICoreLogWriter _coreWriter = new NotThreadSafeLogWriter(ConsoleLogger.SafeWriteLine);
+    private LogWritingThreadMode _threadMode = LogWritingThreadMode.NotThreadSafe;
+    private LoggerConsoleOutputTo _outputTo = LoggerConsoleOutputTo.StandardOutput;
+    private IReadOnlyList<string>? _mainArgs;
 
     /// <summary>
     /// 高于或等于此级别的日志才会被记录。
@@ -25,6 +26,12 @@ public sealed class ConsoleLoggerBuilder
         return this;
     }
 
+    public ConsoleLoggerBuilder WithOutput(LoggerConsoleOutputTo outputTo)
+    {
+        _outputTo = outputTo;
+        return this;
+    }
+
     /// <summary>
     /// 指定控制台日志的线程安全模式。
     /// </summary>
@@ -33,13 +40,7 @@ public sealed class ConsoleLoggerBuilder
     /// <exception cref="ArgumentOutOfRangeException">线程安全模式不支持。</exception>
     public ConsoleLoggerBuilder WithThreadSafe(LogWritingThreadMode threadMode)
     {
-        _coreWriter = threadMode switch
-        {
-            LogWritingThreadMode.NotThreadSafe => new NotThreadSafeLogWriter(ConsoleLogger.SafeWriteLine),
-            LogWritingThreadMode.Lock => new LockLogWriter(ConsoleLogger.SafeWriteLine),
-            LogWritingThreadMode.ProducerConsumer => new ProducerConsumerLogWriter(ConsoleLogger.SafeWriteLine),
-            _ => throw new ArgumentOutOfRangeException(nameof(threadMode)),
-        };
+        _threadMode = threadMode;
         return this;
     }
 
@@ -48,9 +49,9 @@ public sealed class ConsoleLoggerBuilder
     /// </summary>
     /// <param name="args">命令行参数。</param>
     /// <returns>构造器模式。</returns>
-    public ConsoleLoggerBuilder FilterConsoleTagsFromCommandLineArgs(string[] args)
+    public ConsoleLoggerBuilder FilterConsoleTagsFromCommandLineArgs(IReadOnlyList<string> args)
     {
-        _tagFilterManager = TagFilterManager.FromCommandLineArgs(args);
+        _mainArgs = args;
         return this;
     }
 
@@ -58,9 +59,10 @@ public sealed class ConsoleLoggerBuilder
     /// 创建控制台日志记录器。
     /// </summary>
     /// <returns>控制台日志记录器。</returns>
-    internal ConsoleLogger Build() => new(_coreWriter, _tagFilterManager)
+    internal ConsoleLogger Build() => new(_threadMode, _mainArgs)
     {
         Level = Level,
+        OutputTo = _outputTo,
     };
 }
 

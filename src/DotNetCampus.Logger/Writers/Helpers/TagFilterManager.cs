@@ -108,7 +108,7 @@ internal class TagFilterManager
     /// 从命令行参数中提取过滤标签。
     /// </summary>
     /// <param name="args">命令行参数。</param>
-    public static TagFilterManager? FromCommandLineArgs(string[] args)
+    public static TagFilterManager? FromCommandLineArgs(IReadOnlyList<string> args)
     {
         if (!TryGetCommandLineValue(args, LogTagParameterName, out var value))
         {
@@ -151,11 +151,11 @@ internal class TagFilterManager
         };
     }
 
-    private static bool TryGetCommandLineValue(string[] args, string parameterName, [NotNullWhen(true)] out string? value)
+    private static bool TryGetCommandLineValue(IReadOnlyList<string> args, string parameterName, [NotNullWhen(true)] out string? value)
     {
-        for (var i = 0; i < args.Length; i++)
+        for (var i = 0; i < args.Count; i++)
         {
-            if (string.Equals(args[i], parameterName, StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            if (string.Equals(args[i], parameterName, StringComparison.OrdinalIgnoreCase) && i + 1 < args.Count)
             {
                 value = args[i + 1];
                 return true;

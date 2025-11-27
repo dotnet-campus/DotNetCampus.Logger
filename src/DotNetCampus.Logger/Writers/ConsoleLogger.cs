@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading;
 using DotNetCampus.Logging.Writers.ConsoleLoggerHelpers;
 using DotNetCampus.Logging.Writers.Helpers;
 using C = DotNetCampus.Logging.Writers.ConsoleLoggerHelpers.ConsoleColors;
@@ -15,7 +17,12 @@ namespace DotNetCampus.Logging.Writers;
 /// </summary>
 public class ConsoleLogger : ILogger
 {
-    private static readonly TextWriter Out = GetStandardOutputWriter();
+    private readonly Lazy<TextWriter> _outLazy;
+
+    /// <summary>
+    /// 获取用于输出日志的文本写入流。
+    /// </summary>
+    private TextWriter Out => _outLazy.Value;
 
     /// <summary>
     /// 用于处理重复的日志，避免重复日志污染控制台输出内容。
@@ -35,23 +42,24 @@ public class ConsoleLogger : ILogger
     /// </summary>
     /// <param name="threadMode">指定控制台日志的线程安全模式。</param>
     /// <param name="mainArgs">Main 方法的参数。</param>
-    public ConsoleLogger(LogWritingThreadMode threadMode = LogWritingThreadMode.NotThreadSafe, string[]? mainArgs = null)
-        : this(threadMode.CreateCoreLogWriter(SafeWriteLine), TagFilterManager.FromCommandLineArgs(mainArgs ?? []))
-    {
-    }
-
-    internal ConsoleLogger(ICoreLogWriter coreWriter, TagFilterManager? tagManager)
+    public ConsoleLogger(LogWritingThreadMode threadMode = LogWritingThreadMode.NotThreadSafe, IReadOnlyList<string>? mainArgs = null)
     {
         _repeat = new RepeatLoggerDetector(ClearAndMoveToLastLine);
-        CoreWriter = coreWriter;
-        TagManager = tagManager;
+        CoreWriter = threadMode.CreateCoreLogWriter(SafeWriteLine);
+        TagManager = TagFilterManager.FromCommandLineArgs(mainArgs ?? []);
         _isConsoleOutput = ConsoleInitializer.Initialize();
+        _outLazy = new Lazy<TextWriter>(GetStandardOutputWriter, LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
     /// <summary>
     /// 高于或等于此级别的日志才会被记录。
     /// </summary>
     public LogLevel Level { get; init; }
+
+    /// <summary>
+    /// 指定控制台日志输出的目标。
+    /// </summary>
+    public LoggerConsoleOutputTo OutputTo { get; init; }
 
     /// <summary>
     /// 最终日志写入器。
@@ -239,7 +247,7 @@ public class ConsoleLogger : ILogger
     /// 安全地写入一行日志，避免出现 IO 异常。
     /// </summary>
     /// <param name="message"></param>
-    internal static void SafeWriteLine(string? message)
+    internal void SafeWriteLine(string? message)
     {
         try
         {
@@ -309,14 +317,22 @@ public class ConsoleLogger : ILogger
     /// 如果当前在控制台中输出，则使用控制台的输出流；否则创建一个 UTF-8 编码的标准输出流。
     /// </summary>
     /// <returns>文本写入流。</returns>
-    private static TextWriter GetStandardOutputWriter()
+    private TextWriter GetStandardOutputWriter()
     {
         if (Console.OutputEncoding.CodePage is not 0)
         {
-            return Console.Out;
+            return OutputTo switch
+            {
+                LoggerConsoleOutputTo.StandardError => Console.Error,
+                _ => Console.Out,
+            };
         }
 
-        var standardOutput = Console.OpenStandardOutput();
+        var standardOutput = OutputTo switch
+        {
+            LoggerConsoleOutputTo.StandardError => Console.OpenStandardError(),
+            _ => Console.OpenStandardOutput(),
+        };
         var writer = new StreamWriter(standardOutput, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false))
         {
             AutoFlush = true,
@@ -350,4 +366,20 @@ public class ConsoleLogger : ILogger
     private static string ErrorExceptionTag => $"{B.Red}{F.Black} X {Reset}{ErrorText} ";
     private static string CriticalExceptionTag => $"{B.Black}{D.Bold}{F.Red} X {Reset}{CriticalText} ";
     private static string EmptyExceptionTag => "    ";
+}
+
+/// <summary>
+/// 指定控制台日志输出的目标。
+/// </summary>
+public enum LoggerConsoleOutputTo
+{
+    /// <summary>
+    /// 输出到标准输出流。
+    /// </summary>
+    StandardOutput,
+
+    /// <summary>
+    /// 输出到标准错误流。
+    /// </summary>
+    StandardError,
 }
