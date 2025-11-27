@@ -71,6 +71,7 @@ public class ConsoleLogger : ILogger
     /// </summary>
     private TagFilterManager? TagManager { get; }
 
+    /// <inheritdoc />
     public bool IsEnabled(LogLevel logLevel)
     {
         if (logLevel < Level)

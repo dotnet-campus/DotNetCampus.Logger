@@ -26,6 +26,11 @@ public sealed class ConsoleLoggerBuilder
         return this;
     }
 
+    /// <summary>
+    /// 指定控制台日志的输出位置。
+    /// </summary>
+    /// <param name="outputTo">输出位置。</param>
+    /// <returns>用于链式调用的构建器。</returns>
     public ConsoleLoggerBuilder WithOutput(LoggerConsoleOutputTo outputTo)
     {
         _outputTo = outputTo;
@@ -36,7 +41,7 @@ public sealed class ConsoleLoggerBuilder
     /// 指定控制台日志的线程安全模式。
     /// </summary>
     /// <param name="threadMode">线程安全模式。</param>
-    /// <returns>构造器模式。</returns>
+    /// <returns>用于链式调用的构建器。</returns>
     /// <exception cref="ArgumentOutOfRangeException">线程安全模式不支持。</exception>
     public ConsoleLoggerBuilder WithThreadSafe(LogWritingThreadMode threadMode)
     {
@@ -48,7 +53,7 @@ public sealed class ConsoleLoggerBuilder
     /// 从命令行参数中提取过滤标签，使得控制台日志支持过滤标签行为。
     /// </summary>
     /// <param name="args">命令行参数。</param>
-    /// <returns>构造器模式。</returns>
+    /// <returns>用于链式调用的构建器。</returns>
     public ConsoleLoggerBuilder FilterConsoleTagsFromCommandLineArgs(IReadOnlyList<string> args)
     {
         _mainArgs = args;
@@ -76,7 +81,7 @@ public static class ConsoleLoggerBuilderExtensions
     /// </summary>
     /// <param name="builder">日志构建器。</param>
     /// <param name="configure">配置控制台日志记录器。</param>
-    /// <returns>日志构建器。</returns>
+    /// <returns>用于链式调用的构建器。</returns>
     public static LoggerBuilder AddConsoleLogger(this LoggerBuilder builder, Action<ConsoleLoggerBuilder> configure)
     {
         var consoleLoggerBuilder = new ConsoleLoggerBuilder();

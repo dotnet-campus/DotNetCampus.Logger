@@ -30,6 +30,7 @@ public class CompositeLogger : ILogger
     /// </summary>
     public required IReadOnlyList<ILogger> Writers { get; init; }
 
+    /// <inheritdoc />
     public bool IsEnabled(LogLevel logLevel)
     {
         if (logLevel < Level)
@@ -40,6 +41,7 @@ public class CompositeLogger : ILogger
         return true;
     }
 
+    /// <inheritdoc />
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
         if (logLevel < Level)

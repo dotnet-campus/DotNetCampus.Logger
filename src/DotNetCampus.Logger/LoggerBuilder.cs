@@ -29,6 +29,11 @@ public class LoggerBuilder
         return this;
     }
 
+    /// <summary>
+    /// 指定日志记录器的日志级别。
+    /// </summary>
+    /// <param name="level">日志级别。</param>
+    /// <returns>用于链式调用的构建器。</returns>
     public LoggerBuilder WithLevel(LogLevel level)
     {
         _options ??= new LogOptions();
@@ -36,24 +41,44 @@ public class LoggerBuilder
         return this;
     }
 
+    /// <summary>
+    /// 指定日志记录器的配置选项。
+    /// </summary>
+    /// <param name="options">日志配置选项。</param>
+    /// <returns>用于链式调用的构建器。</returns>
     public LoggerBuilder WithOptions(LogOptions options)
     {
         _options = options;
         return this;
     }
 
+    /// <summary>
+    /// 添加一个日志写入器。
+    /// </summary>
+    /// <param name="writer">要添加的日志写入器。</param>
+    /// <returns>用于链式调用的构建器。</returns>
     public LoggerBuilder AddWriter(ILogger writer)
     {
         _writers.Add(writer);
         return this;
     }
 
+    /// <summary>
+    /// 添加一个日志桥接器。<br/>
+    /// 可通过编写一个 internal partial class LoggerBridgeLinker 并为其标记 [ImportLoggerBridge] 特性来实现自动生成桥接代码。
+    /// </summary>
+    /// <param name="linker">要添加的日志桥接器。</param>
+    /// <returns>用于链式调用的构建器。</returns>
     public LoggerBuilder AddBridge(ILoggerBridgeLinker linker)
     {
         _linkers.Add(linker);
         return this;
     }
 
+    /// <summary>
+    /// 创建复合日志记录器。
+    /// </summary>
+    /// <returns>复合日志记录器的构建器。</returns>
     public virtual LoggerBuilder<CompositeLogger> Build()
     {
         var logger = new CompositeLogger(_options ?? new LogOptions())
