@@ -139,9 +139,7 @@ public class ConsoleLogger : ILogger
             if (_isConsoleOutput && hasColors)
             {
                 string SingleLineFormatter(string m, int i) => $"{firstLineStyle}{m}{reset}";
-                var repeatMessage = hasColors
-                    ? $"{reset}{F.BrightBlack}上述日志已重复 {count} 次{reset}"
-                    : $"上述日志已重复 {count} 次";
+                var repeatMessage = $"{reset}{F.BrightBlack}上述日志已重复 {count} 次{reset}";
                 ConsoleMultilineMessage(repeatMessage, SingleLineFormatter, forceSingleLine: true);
             }
             else
