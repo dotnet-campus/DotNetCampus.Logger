@@ -69,7 +69,7 @@ public sealed class ConsoleLoggerBuilder
     {
         _formatOptions = LoggerConsoleFormatOptions.StdioRedirected;
         _outputTo = LoggerConsoleOutputTo.StandardError;
-        _levelPrefixAlignment = LoggerLevelPrefixAlignment.ShortAligned;
+        _levelPrefixAlignment = LoggerLevelPrefixAlignment.Short;
         return this;
     }
 

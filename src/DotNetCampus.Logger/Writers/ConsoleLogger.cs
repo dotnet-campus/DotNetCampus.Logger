@@ -402,8 +402,9 @@ public class ConsoleLogger : ILogger
         {
             length += LevelPrefixAlignment switch
             {
-                LoggerLevelPrefixAlignment.ShortAligned => 5, // [INF]
-                LoggerLevelPrefixAlignment.FullAligned => 10, // [CRITICAL]
+                LoggerLevelPrefixAlignment.Compact => 5, // [TRC]
+                LoggerLevelPrefixAlignment.Short => 6, // [TRCE]
+                LoggerLevelPrefixAlignment.Full => 13, // [INFORMATION]
                 _ => 0, // 长度不固定
             };
         }
@@ -435,31 +436,41 @@ file static class Extensions
         /// </summary>
         internal string ToPrefixTag(LoggerLevelPrefixAlignment alignment) => alignment switch
         {
-            LoggerLevelPrefixAlignment.ShortAligned => level switch
+            LoggerLevelPrefixAlignment.Compact => level switch
             {
                 LogLevel.Trace /*      */ => "[TRC]",
                 LogLevel.Debug /*      */ => "[DBG]",
                 LogLevel.Information /**/ => "[INF]",
-                LogLevel.Warning /*    */ => "[WAR]",
+                LogLevel.Warning /*    */ => "[WRN]",
                 LogLevel.Error /*      */ => "[ERR]",
-                LogLevel.Critical /*   */ => "[CRT]",
+                LogLevel.Critical /*   */ => "[FTL]",
                 _ /*                   */ => "[   ]",
             },
-            LoggerLevelPrefixAlignment.FullAligned => level switch
+            LoggerLevelPrefixAlignment.Short => level switch
             {
-                LogLevel.Trace /*      */ => "[TRACE   ]",
-                LogLevel.Debug /*      */ => "[DEBUG   ]",
-                LogLevel.Information /**/ => "[INFO    ]",
-                LogLevel.Warning /*    */ => "[WARNING ]",
-                LogLevel.Error /*      */ => "[ERROR   ]",
-                LogLevel.Critical /*   */ => "[CRITICAL]",
-                _ /*                   */ => "[        ]",
+                LogLevel.Trace /*      */ => "[TRCE]",
+                LogLevel.Debug /*      */ => "[DBUG]",
+                LogLevel.Information /**/ => "[INFO]",
+                LogLevel.Warning /*    */ => "[WARN]",
+                LogLevel.Error /*      */ => "[ERRO]",
+                LogLevel.Critical /*   */ => "[CRIT]",
+                _ /*                   */ => "[    ]",
+            },
+            LoggerLevelPrefixAlignment.Full => level switch
+            {
+                LogLevel.Trace /*      */ => "[TRACE      ]",
+                LogLevel.Debug /*      */ => "[DEBUG      ]",
+                LogLevel.Information /**/ => "[INFORMATION]",
+                LogLevel.Warning /*    */ => "[WARNING    ]",
+                LogLevel.Error /*      */ => "[ERROR      ]",
+                LogLevel.Critical /*   */ => "[CRITICAL   ]",
+                _ /*                   */ => "[           ]",
             },
             _ => level switch // NoAlignment
             {
                 LogLevel.Trace /*      */ => "[TRACE]",
                 LogLevel.Debug /*      */ => "[DEBUG]",
-                LogLevel.Information /**/ => "[INFO]",
+                LogLevel.Information /**/ => "[INFORMATION]",
                 LogLevel.Warning /*    */ => "[WARNING]",
                 LogLevel.Error /*      */ => "[ERROR]",
                 LogLevel.Critical /*   */ => "[CRITICAL]",
@@ -599,14 +610,20 @@ public enum LoggerLevelPrefixAlignment
     NoAlignment,
 
     /// <summary>
-    /// 短名称对齐（4-5 字符）。
-    /// 示例：[TRC ], [INFO], [ERR ], [CRIT]
+    /// 紧凑对齐（3 字符）。
+    /// 示例：[TRC], [INF], [WAR], [ERR], [FTL]
     /// </summary>
-    ShortAligned,
+    Compact,
 
     /// <summary>
-    /// 完整名称对齐（11 字符）。
-    /// 示例：[TRACE      ], [INFORMATION], [ERROR      ]
+    /// 短名称对齐（4 字符）。
+    /// 示例：[TRCE], [INFO], [WARN], [ERRO], [CRIT]
     /// </summary>
-    FullAligned,
+    Short,
+
+    /// <summary>
+    /// 完整名称对齐（11 字符，含括号 13 字符）。
+    /// 示例：[TRACE      ], [INFORMATION], [WARNING    ], [ERROR      ], [CRITICAL   ]
+    /// </summary>
+    Full,
 }
