@@ -10,6 +10,8 @@ public sealed class ConsoleLoggerBuilder
 {
     private LogWritingThreadMode _threadMode = LogWritingThreadMode.NotThreadSafe;
     private LoggerConsoleOutputTo _outputTo = LoggerConsoleOutputTo.StandardOutput;
+    private LoggerConsoleFormatOptions _formatOptions = LoggerConsoleFormatOptions.ColorfulConsole;
+    private LoggerLevelPrefixAlignment _levelPrefixAlignment = LoggerLevelPrefixAlignment.NoAlignment;
     private IReadOnlyList<string>? _mainArgs;
 
     /// <summary>
@@ -34,6 +36,51 @@ public sealed class ConsoleLoggerBuilder
     public ConsoleLoggerBuilder WithOutput(LoggerConsoleOutputTo outputTo)
     {
         _outputTo = outputTo;
+        return this;
+    }
+
+    /// <summary>
+    /// 指定控制台日志的格式化选项。
+    /// </summary>
+    /// <param name="options">格式化选项。</param>
+    /// <returns>用于链式调用的构建器。</returns>
+    public ConsoleLoggerBuilder WithFormat(LoggerConsoleFormatOptions options)
+    {
+        _formatOptions = options;
+        return this;
+    }
+
+    /// <summary>
+    /// 使用默认格式（时间戳 + 颜色）。
+    /// </summary>
+    /// <returns>用于链式调用的构建器。</returns>
+    public ConsoleLoggerBuilder WithColorfulConsoleFormat()
+    {
+        _formatOptions = LoggerConsoleFormatOptions.ColorfulConsole;
+        return this;
+    }
+
+    /// <summary>
+    /// 使用 STDIO 重定向格式（时间戳 + 级别前缀，无颜色，输出到 StandardError）。
+    /// 适用于需要将日志输出到标准错误流的场景（如 STDIO 协议服务器）。
+    /// </summary>
+    /// <returns>用于链式调用的构建器。</returns>
+    public ConsoleLoggerBuilder WithStdioRedirectedFormat()
+    {
+        _formatOptions = LoggerConsoleFormatOptions.StdioRedirected;
+        _outputTo = LoggerConsoleOutputTo.StandardError;
+        _levelPrefixAlignment = LoggerLevelPrefixAlignment.ShortAligned;
+        return this;
+    }
+
+    /// <summary>
+    /// 指定级别前缀的对齐方式（仅在启用 LevelPrefix 时生效）。
+    /// </summary>
+    /// <param name="alignment">对齐方式。</param>
+    /// <returns>用于链式调用的构建器。</returns>
+    public ConsoleLoggerBuilder WithLevelPrefixAlignment(LoggerLevelPrefixAlignment alignment)
+    {
+        _levelPrefixAlignment = alignment;
         return this;
     }
 
@@ -68,6 +115,8 @@ public sealed class ConsoleLoggerBuilder
     {
         Level = Level,
         OutputTo = _outputTo,
+        FormatOptions = _formatOptions,
+        LevelPrefixAlignment = _levelPrefixAlignment,
     };
 }
 
