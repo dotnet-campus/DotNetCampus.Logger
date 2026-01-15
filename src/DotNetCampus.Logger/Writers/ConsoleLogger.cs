@@ -611,7 +611,7 @@ public enum LoggerLevelPrefixAlignment
 
     /// <summary>
     /// 紧凑对齐（3 字符）。
-    /// 示例：[TRC], [INF], [WAR], [ERR], [FTL]
+    /// 示例：[TRC], [INF], [WRN], [ERR], [FTL]
     /// </summary>
     Compact,
 
