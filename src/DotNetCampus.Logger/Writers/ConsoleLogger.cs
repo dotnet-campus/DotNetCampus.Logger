@@ -116,7 +116,6 @@ public class ConsoleLogger : ILogger
     private void LogCore(LogLevel logLevel, Exception? exception, string message) => CoreWriter.Do(() =>
     {
         var builder = new ConsoleLogTextBuilder(FormatOptions);
-        int? padLineWidth = logLevel is LogLevel.Critical ? SafeGetBufferWidth() : null;
 
         // 处理重复日志
         if (_repeat.RepeatOrResetLastLog(logLevel, message, exception) is var count and > 1)
@@ -128,12 +127,12 @@ public class ConsoleLogger : ILogger
             if (_isConsoleOutput)
             {
                 // 控制台模式：覆盖上一行并显示重复信息
-                output = builder.ToLoggerString(logLevel, padLineWidth, $"上述日志已重复 {count} 次");
+                output = builder.ToLoggerString(logLevel, $"上述日志已重复 {count} 次");
             }
             else
             {
                 // 非控制台模式：正常消息 + 重复次数
-                output = builder.ToLoggerString(logLevel, padLineWidth, $"{message} (重复 {count} 次)");
+                output = builder.ToLoggerString(logLevel, $"{message} (重复 {count} 次)");
             }
 
             SafeWriteLine(output);
@@ -148,11 +147,11 @@ public class ConsoleLogger : ILogger
         if (exception is not null)
         {
             builder.AppendExceptionMarker(logLevel);
-            logOutput = builder.ToLoggerString(logLevel, padLineWidth, message, exception.ToString());
+            logOutput = builder.ToLoggerString(logLevel, message, exception.ToString());
         }
         else
         {
-            logOutput = builder.ToLoggerString(logLevel, padLineWidth, message);
+            logOutput = builder.ToLoggerString(logLevel, message);
         }
 
         SafeWriteLine(logOutput);
@@ -322,20 +321,10 @@ internal struct ConsoleLogTextBuilder(LoggerConsoleFormatOptions formatOptions)
         }
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public string ToLoggerString(LogLevel level, params
-#if NET6_0_OR_GREATER
-        ReadOnlySpan<string>
-#else
-        string[]
-#endif
-        messages) => ToLoggerString(level, null, messages);
-
     /// <summary>
     /// 完整创建日志字符串，并返回。此方法调用完成后，<see cref="ConsoleLogTextBuilder"/> 的状态并不会发生变化，因此可以反复调用用来创建不同的日志文本。
     /// </summary>
     /// <param name="level">日志级别。</param>
-    /// <param name="padLineWidth">如果每一行需要使用空格对齐到行尾，则传入行宽，否则保持为 <see langword="null"/>。</param>
     /// <param name="messages">日志字符串（可能有多段，如异常日志的消息和异常文本；每一段可能是一个多行文本）。</param>
     /// <returns>
     /// 完整的可直接写入到控制台的日志字符串。
@@ -351,7 +340,7 @@ internal struct ConsoleLogTextBuilder(LoggerConsoleFormatOptions formatOptions)
     /// </code>
     /// </returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public string ToLoggerString(LogLevel level, int? padLineWidth, params
+    public string ToLoggerString(LogLevel level, params
 #if NET6_0_OR_GREATER
         ReadOnlySpan<string>
 #else
@@ -381,17 +370,6 @@ internal struct ConsoleLogTextBuilder(LoggerConsoleFormatOptions formatOptions)
                         result.Append(textColor);
                     }
                     result.Append(trimmedLine);
-
-                    // 填充到行尾
-                    if (padLineWidth.HasValue)
-                    {
-                        var currentLength = tagLength + 1 + trimmedLine.Length;
-                        if (currentLength < padLineWidth.Value)
-                        {
-                            result.Append(' ', padLineWidth.Value - currentLength);
-                        }
-                    }
-
                     if (!string.IsNullOrEmpty(reset))
                     {
                         result.Append(reset);
@@ -409,17 +387,6 @@ internal struct ConsoleLogTextBuilder(LoggerConsoleFormatOptions formatOptions)
                         result.Append(textColor);
                     }
                     result.Append(trimmedLine);
-
-                    // 填充到行尾
-                    if (padLineWidth.HasValue)
-                    {
-                        var currentLength = tagLength + 1 + trimmedLine.Length;
-                        if (currentLength < padLineWidth.Value)
-                        {
-                            result.Append(' ', padLineWidth.Value - currentLength);
-                        }
-                    }
-
                     if (!string.IsNullOrEmpty(reset))
                     {
                         result.Append(reset);
