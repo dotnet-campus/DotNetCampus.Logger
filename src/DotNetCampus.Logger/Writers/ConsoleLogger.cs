@@ -522,10 +522,10 @@ file static class Extensions
 
             return $"{level.ToTagColor()}{level switch
             {
-                LogLevel.Warning => "!",
-                LogLevel.Error => "X",
-                LogLevel.Critical => "X",
-                _ => " ",
+                LogLevel.Warning => " ! ",
+                LogLevel.Error => " X ",
+                LogLevel.Critical => " X ",
+                _ => "   ",
             }}{C.Reset}{level.ToTextColor()} ";
         }
     }
@@ -602,26 +602,58 @@ public enum LoggerConsoleFormatOptions
 public enum LoggerLevelPrefixAlignment
 {
     /// <summary>
-    /// 不对齐（紧凑格式）。
-    /// 示例：[TRACE], [INFORMATION], [ERROR]
+    /// 不对齐。
+    /// <code>
+    /// [TRACE] = Trace
+    /// [DEBUG] = Debug
+    /// [INFORMATION] = Information
+    /// [WARNING] = Warning
+    /// [ERROR] = Error
+    /// [CRITICAL] = Critical
+    /// []
+    /// </code>
     /// </summary>
     NoAlignment,
 
     /// <summary>
-    /// 紧凑对齐（3 字符）。
-    /// 示例：[TRC], [INF], [WRN], [ERR], [FTL]
+    /// 紧凑对齐（级别缩写 3 字符，含括号共 5 字符）。
+    /// <code>
+    /// [TRC] = Trace
+    /// [DBG] = Debug
+    /// [INF] = Information
+    /// [WRN] = Warning
+    /// [ERR] = Error
+    /// [FTL] = Critical
+    /// [   ]
+    /// </code>
     /// </summary>
     Compact,
 
     /// <summary>
-    /// 短名称对齐（4 字符）。
-    /// 示例：[TRCE], [INFO], [WARN], [ERRO], [CRIT]
+    /// 短名称对齐（级别缩写 4 字符，含括号共 6 字符）。
+    /// <code>
+    /// [TRCE] = Trace
+    /// [DBUG] = Debug
+    /// [INFO] = Information
+    /// [WARN] = Warning
+    /// [ERRO] = Error
+    /// [CRIT] = Critical
+    /// [    ]
+    /// </code>
     /// </summary>
     Short,
 
     /// <summary>
-    /// 完整名称对齐（11 字符，含括号 13 字符）。
-    /// 示例：[TRACE      ], [INFORMATION], [WARNING    ], [ERROR      ], [CRITICAL   ]
+    /// 完整名称对齐（级别缩写 11 字符，含括号共 13 字符）。
+    /// <code>
+    /// [TRACE      ] = Trace
+    /// [DEBUG      ] = Debug
+    /// [INFORMATION] = Information
+    /// [WARNING    ] = Warning
+    /// [ERROR      ] = Error
+    /// [CRITICAL   ] = Critical
+    /// [           ]
+    /// </code>
     /// </summary>
     Full,
 }
