@@ -356,10 +356,33 @@ internal struct ConsoleLogTextBuilder(LoggerConsoleFormatOptions formatOptions)
 
         foreach (var message in messages)
         {
-            var lines = message.Split('\n');
-            foreach (var line in lines)
+#if NET6_0_OR_GREATER
+            var messageSpan = message.AsSpan();
+            while (messageSpan.Length > 0)
             {
-                var trimmedLine = line.TrimEnd('\r');
+                var newlineIndex = messageSpan.IndexOf('\n');
+                ReadOnlySpan<char> line;
+
+                if (newlineIndex >= 0)
+                {
+                    line = messageSpan[..newlineIndex];
+                    messageSpan = messageSpan[(newlineIndex + 1)..];
+                }
+                else
+                {
+                    line = messageSpan;
+                    messageSpan = ReadOnlySpan<char>.Empty;
+                }
+
+                if (line.Length > 0 && line[^1] == '\r')
+                {
+                    line = line[..^1];
+                }
+#else
+            foreach (var rawLine in message.Split('\n'))
+            {
+                var line = rawLine.TrimEnd('\r');
+#endif
 
                 if (isFirstLine)
                 {
@@ -369,7 +392,7 @@ internal struct ConsoleLogTextBuilder(LoggerConsoleFormatOptions formatOptions)
                     {
                         result.Append(textColor);
                     }
-                    result.Append(trimmedLine);
+                    result.Append(line);
                     if (!string.IsNullOrEmpty(reset))
                     {
                         result.Append(reset);
@@ -386,7 +409,7 @@ internal struct ConsoleLogTextBuilder(LoggerConsoleFormatOptions formatOptions)
                     {
                         result.Append(textColor);
                     }
-                    result.Append(trimmedLine);
+                    result.Append(line);
                     if (!string.IsNullOrEmpty(reset))
                     {
                         result.Append(reset);
