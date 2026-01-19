@@ -442,7 +442,7 @@ internal struct ConsoleLogTextBuilder(LoggerConsoleFormatOptions formatOptions)
             LogLevel.Warning /*    */ => "[WARNING    ]",
             LogLevel.Error /*      */ => "[ERROR      ]",
             LogLevel.Critical /*   */ => "[CRITICAL   ]",
-            _ /*                   */ => "[            ]",
+            _ /*                   */ => "[           ]",
         },
         _ => level switch // NoAlignment
         {
