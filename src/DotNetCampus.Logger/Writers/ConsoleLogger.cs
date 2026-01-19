@@ -107,90 +107,54 @@ public class ConsoleLogger : ILogger
             return;
         }
 
-        // 使用新的动态标签生成
-        var tag = GetTag(logLevel);
-        var emptyTag = GetEmptyTag();
-        var hasColors = FormatOptions.FastHasFlag(LoggerConsoleFormatOptions.Colors);
-        var textColor = hasColors ? logLevel.ToTextColor() : "";
-
-        var firstLineStyle = string.IsNullOrEmpty(tag) ? textColor : $"{tag} {textColor}";
-        var otherLineStyle = string.IsNullOrEmpty(emptyTag) ? textColor : $"{emptyTag} {textColor}";
-
-        LogCore(logLevel, exception, message, firstLineStyle, otherLineStyle);
+        LogCore(logLevel, exception, message);
     }
 
     /// <summary>
-    /// 记录日志。在必要的情况下会保证线程安全。
+    /// 记录日志核心逻辑。在必要的情况下会保证线程安全。
     /// </summary>
-    /// <param name="logLevel">日志严重程度。</param>
-    /// <param name="exception">如果有异常，则记录异常。</param>
-    /// <param name="message">日志的消息内容。</param>
-    /// <param name="firstLineStyle">日志的首行样式（如果只有一行，也使用此样式）。</param>
-    /// <param name="otherLineStyle">日志的其他行样式。</param>
-    private void LogCore(LogLevel logLevel, Exception? exception, string message, string firstLineStyle, string otherLineStyle) => CoreWriter.Do(() =>
+    private void LogCore(LogLevel logLevel, Exception? exception, string message) => CoreWriter.Do(() =>
     {
-        var hasColors = FormatOptions.FastHasFlag(LoggerConsoleFormatOptions.Colors);
-        var reset = hasColors ? C.Reset : "";
-        var emptyTag = GetEmptyTag();
+        var builder = new ConsoleLogTextBuilder(FormatOptions);
 
+        // 处理重复日志
         if (_repeat.RepeatOrResetLastLog(logLevel, message, exception) is var count and > 1)
         {
-            // 仅在控制台输出且启用颜色时才使用光标控制
-            if (_isConsoleOutput && hasColors)
+            builder.AppendTimestamp(logLevel);
+            builder.AppendLevelPrefix(logLevel, LevelPrefixAlignment);
+
+            string output;
+            if (_isConsoleOutput)
             {
-                string SingleLineFormatter(string m, int i) => $"{firstLineStyle}{m}{reset}";
-                var repeatMessage = $"{reset}{F.BrightBlack}上述日志已重复 {count} 次{reset}";
-                ConsoleMultilineMessage(repeatMessage, SingleLineFormatter, forceSingleLine: true);
+                // 控制台模式：覆盖上一行并显示重复信息
+                output = builder.ToLoggerString(logLevel, $"上述日志已重复 {count} 次");
             }
             else
             {
-                var repeatSuffix = hasColors
-                    ? $" {reset}{F.BrightBlack}(重复 {count} 次){reset}"
-                    : $" (重复 {count} 次)";
-
-                string AppendFirstLineFormatter(string m, int i) => $"{firstLineStyle}{m}{repeatSuffix}";
-
-                string OtherLineFormatter(string m, int i) => logLevel is LogLevel.Critical
-                    ? $"{otherLineStyle}{m.PadRight(SafeGetSpaceCount(" ", emptyTag))}{reset}"
-                    : $"{otherLineStyle}{m}{reset}";
-
-                ConsoleMultilineMessage(message, AppendFirstLineFormatter, OtherLineFormatter);
+                // 非控制台模式：正常消息 + 重复次数
+                output = builder.ToLoggerString(logLevel, $"{message} (重复 {count} 次)");
             }
+
+            SafeWriteLine(output);
+            return;
         }
-        else if (exception is null)
+
+        // 正常日志 - 支持多行
+        builder.AppendTimestamp(logLevel);
+        builder.AppendLevelPrefix(logLevel, LevelPrefixAlignment);
+
+        string logOutput;
+        if (exception is not null)
         {
-            string FirstLineFormatter(string m, int i) => logLevel is LogLevel.Critical
-                ? $"{firstLineStyle}{m.PadRight(SafeGetSpaceCount(" ", emptyTag))}{reset}"
-                : $"{firstLineStyle}{m}{reset}";
-
-            string OtherLineFormatter(string m, int i) => logLevel is LogLevel.Critical
-                ? $"{otherLineStyle}{m.PadRight(SafeGetSpaceCount(" ", emptyTag))}{reset}"
-                : $"{otherLineStyle}{m}{reset}";
-
-            ConsoleMultilineMessage(message, FirstLineFormatter, OtherLineFormatter);
+            builder.AppendExceptionMarker(logLevel);
+            logOutput = builder.ToLoggerString(logLevel, message, exception.ToString());
         }
         else
         {
-            var exceptionTag = logLevel.ToExceptionTag(FormatOptions);
-            var emptyExceptionTag = new string(' ', exceptionTag.Length);
-
-            string FirstLineFormatter(string m, int i) => logLevel is LogLevel.Critical
-                ? $"{firstLineStyle}{m.PadRight(SafeGetSpaceCount(" ", emptyTag))}{reset}"
-                : $"{firstLineStyle}{m}{reset}";
-
-            string OtherLineFormatter(string m, int i) => (logLevel, i) switch
-            {
-                (LogLevel.Critical, 1) => $"{otherLineStyle}{exceptionTag}{m.PadRight(SafeGetSpaceCount(" ", emptyTag, emptyExceptionTag))}{reset}",
-                (LogLevel.Critical, _) => $"{otherLineStyle}{m.PadRight(SafeGetSpaceCount(" ", emptyTag))}{reset}",
-                (_, 1) => $"{otherLineStyle}{exceptionTag}{m}{reset}",
-                _ => $"{otherLineStyle}{m}{reset}",
-            };
-
-            ConsoleMultilineMessage($"""
-                {message}
-                {exception}
-                """, FirstLineFormatter, OtherLineFormatter);
+            logOutput = builder.ToLoggerString(logLevel, message);
         }
+
+        SafeWriteLine(logOutput);
     });
 
     /// <summary>
@@ -199,10 +163,7 @@ public class ConsoleLogger : ILogger
     /// <param name="repeatCount">此移动光标，是因为日志已重复第几次。</param>
     private void ClearAndMoveToLastLine(int repeatCount)
     {
-        var hasColors = FormatOptions.FastHasFlag(LoggerConsoleFormatOptions.Colors);
-
-        // 仅在控制台输出且启用颜色时才使用光标控制
-        if (!_isConsoleOutput || !hasColors)
+        if (!_isConsoleOutput)
         {
             return;
         }
@@ -225,39 +186,10 @@ public class ConsoleLogger : ILogger
     }
 
     /// <summary>
-    /// 记录多行日志。
-    /// </summary>
-    /// <param name="message">多行日志消息内容。</param>
-    /// <param name="firstLineFormatter">首行格式化。</param>
-    /// <param name="otherLineFormatter">其他行格式化（如果设置为 <see langword="null"/> 则与首行相同。</param>
-    /// <param name="forceSingleLine">将多行消息内容视为单行内容记录。</param>
-    private void ConsoleMultilineMessage(string message,
-        Func<string, int, string?> firstLineFormatter, Func<string, int, string?>? otherLineFormatter = null, bool forceSingleLine = false)
-    {
-        if (forceSingleLine || !message.Contains('\n'))
-        {
-            SafeWriteLine(firstLineFormatter(message, 0));
-        }
-        else
-        {
-            var lineIndex = 0;
-            using var reader = new StringReader(message);
-            while (reader.ReadLine() is { } line)
-            {
-                var formatter = lineIndex is 0
-                    ? firstLineFormatter
-                    : otherLineFormatter ?? firstLineFormatter;
-                SafeWriteLine(formatter(line, lineIndex));
-                lineIndex++;
-            }
-        }
-    }
-
-    /// <summary>
     /// 安全地写入一行日志，避免出现 IO 异常。
     /// </summary>
     /// <param name="message"></param>
-    internal void SafeWriteLine(string? message)
+    private void SafeWriteLine(string? message)
     {
         try
         {
@@ -289,40 +221,6 @@ public class ConsoleLogger : ILogger
     }
 
     /// <summary>
-    /// 安全地获取填充控制台行所需的剩余空白字符数量，避免出现 IO 异常或超出控制台宽度的情况。<br/>
-    /// </summary>
-    /// <param name="messages">填充剩余字符数量前，该行会输出的字符串。</param>
-    /// <returns>填充控制台行所需的剩余字符数量。</returns>
-    private int SafeGetSpaceCount(params
-#if NET6_0_OR_GREATER
-        ReadOnlySpan<string>
-#else
-        string[]
-#endif
-        messages)
-    {
-        var width = SafeGetBufferWidth();
-        if (width == 0)
-        {
-            return 0;
-        }
-
-        var paddingWidth = width;
-
-        for (var i = 0; i < messages.Length; i++)
-        {
-            paddingWidth -= messages[i].Length;
-        }
-
-        if (paddingWidth < 0)
-        {
-            return 0;
-        }
-
-        return paddingWidth;
-    }
-
-    /// <summary>
     /// 获取标准输出的写入流。<br/>
     /// 如果当前在控制台中输出，则使用控制台的输出流；否则创建一个 UTF-8 编码的标准输出流。
     /// </summary>
@@ -349,195 +247,281 @@ public class ConsoleLogger : ILogger
         };
         return writer;
     }
-
-    #region 动态标签生成
-
-    /// <summary>
-    /// 获取日志标签（包括时间戳、级别前缀、颜色）。
-    /// </summary>
-    private string GetTag(LogLevel level)
-    {
-        var hasTimestamp = FormatOptions.FastHasFlag(LoggerConsoleFormatOptions.Timestamp);
-        var hasColors = FormatOptions.FastHasFlag(LoggerConsoleFormatOptions.Colors);
-        var hasLevelPrefix = FormatOptions.FastHasFlag(LoggerConsoleFormatOptions.LevelPrefix);
-
-        var parts = new List<string>();
-
-        // 时间戳部分
-        if (hasTimestamp)
-        {
-            var timestamp = $"[{DateTime.Now:HH:mm:ss.fff}]";
-            parts.Add(hasColors ? $"{level.ToTagColor()}{timestamp}{C.Reset}" : timestamp);
-        }
-
-        // 级别前缀部分
-        if (hasLevelPrefix)
-        {
-            var levelPrefix = level.ToPrefixTag(LevelPrefixAlignment);
-            parts.Add(levelPrefix);
-        }
-
-        return string.Join("", parts);
-    }
-
-    /// <summary>
-    /// 获取空标签（用于多行日志的对齐）。
-    /// </summary>
-    private string GetEmptyTag()
-    {
-        var hasTimestamp = FormatOptions.FastHasFlag(LoggerConsoleFormatOptions.Timestamp);
-        var hasColors = FormatOptions.FastHasFlag(LoggerConsoleFormatOptions.Colors);
-        var hasLevelPrefix = FormatOptions.FastHasFlag(LoggerConsoleFormatOptions.LevelPrefix);
-
-        var length = 0;
-
-        if (hasTimestamp)
-        {
-            length += 14; // [HH:mm:ss.fff]
-        }
-
-        if (hasLevelPrefix)
-        {
-            length += LevelPrefixAlignment switch
-            {
-                LoggerLevelPrefixAlignment.Compact => 5, // [TRC]
-                LoggerLevelPrefixAlignment.Short => 6, // [TRCE]
-                LoggerLevelPrefixAlignment.Full => 13, // [INFORMATION]
-                _ => 0, // 长度不固定
-            };
-        }
-
-        if (length == 0)
-        {
-            return "";
-        }
-
-        var emptyTag = new string(' ', length);
-
-        if (hasColors)
-        {
-            return $"{F.BrightBlack}{emptyTag}{C.Reset}";
-        }
-
-        return emptyTag;
-    }
-
-    #endregion
 }
 
-file static class Extensions
+/// <summary>
+/// 控制台日志文本构建器，用于高效构建带颜色格式的日志文本。
+/// </summary>
+internal struct ConsoleLogTextBuilder(LoggerConsoleFormatOptions formatOptions)
 {
-    extension(LogLevel level)
+    private readonly StringBuilder _builder = new(64);
+    private readonly bool _hasTimestamp = formatOptions.FastHasFlag(LoggerConsoleFormatOptions.Timestamp);
+    private readonly bool _hasColors = formatOptions.FastHasFlag(LoggerConsoleFormatOptions.Colors);
+    private readonly bool _hasLevelPrefix = formatOptions.FastHasFlag(LoggerConsoleFormatOptions.LevelPrefix);
+
+    /// <summary>
+    /// 获取可见字符长度（不包含 ANSI 转义码）。
+    /// </summary>
+    public int VisibleLength { get; private set; }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void AppendTimestamp(LogLevel level)
     {
-        /// <summary>
-        /// 将日志级别转换为对应的文本级别前缀。
-        /// </summary>
-        internal string ToPrefixTag(LoggerLevelPrefixAlignment alignment) => alignment switch
+        if (!_hasTimestamp)
         {
-            LoggerLevelPrefixAlignment.Compact => level switch
-            {
-                LogLevel.Trace /*      */ => "[TRC]",
-                LogLevel.Debug /*      */ => "[DBG]",
-                LogLevel.Information /**/ => "[INF]",
-                LogLevel.Warning /*    */ => "[WRN]",
-                LogLevel.Error /*      */ => "[ERR]",
-                LogLevel.Critical /*   */ => "[FTL]",
-                _ /*                   */ => "[   ]",
-            },
-            LoggerLevelPrefixAlignment.Short => level switch
-            {
-                LogLevel.Trace /*      */ => "[TRCE]",
-                LogLevel.Debug /*      */ => "[DBUG]",
-                LogLevel.Information /**/ => "[INFO]",
-                LogLevel.Warning /*    */ => "[WARN]",
-                LogLevel.Error /*      */ => "[ERRO]",
-                LogLevel.Critical /*   */ => "[CRIT]",
-                _ /*                   */ => "[    ]",
-            },
-            LoggerLevelPrefixAlignment.Full => level switch
-            {
-                LogLevel.Trace /*      */ => "[TRACE      ]",
-                LogLevel.Debug /*      */ => "[DEBUG      ]",
-                LogLevel.Information /**/ => "[INFORMATION]",
-                LogLevel.Warning /*    */ => "[WARNING    ]",
-                LogLevel.Error /*      */ => "[ERROR      ]",
-                LogLevel.Critical /*   */ => "[CRITICAL   ]",
-                _ /*                   */ => "[           ]",
-            },
-            _ => level switch // NoAlignment
-            {
-                LogLevel.Trace /*      */ => "[TRACE]",
-                LogLevel.Debug /*      */ => "[DEBUG]",
-                LogLevel.Information /**/ => "[INFORMATION]",
-                LogLevel.Warning /*    */ => "[WARNING]",
-                LogLevel.Error /*      */ => "[ERROR]",
-                LogLevel.Critical /*   */ => "[CRITICAL]",
-                _ /*                   */ => "[]",
-            },
-        };
+            return;
+        }
 
-        /// <summary>
-        /// 获取级别对应的前缀标签的颜色转义字符。
-        /// </summary>
-        internal string ToTagColor() => level switch
+        if (_hasColors)
         {
-            LogLevel.Trace => F.BrightBlack,
-            LogLevel.Debug => F.Magenta,
-            LogLevel.Information => $"{B.Green}{F.Black}",
-            LogLevel.Warning => $"{B.Yellow}{F.Black}",
-            LogLevel.Error => $"{B.Red}{F.Black}",
-            LogLevel.Critical => $"{B.Black}{D.Bold}{F.Red}",
-            _ => C.Reset,
-        };
+            _builder.Append(GetTagFormat(level));
+        }
+        _builder.Append('[').Append(DateTime.Now.ToString("HH:mm:ss.fff")).Append(']');
+        VisibleLength += 14; // [HH:mm:ss.fff]
+        if (_hasColors)
+        {
+            _builder.Append(C.Reset);
+        }
+    }
 
-        /// <summary>
-        /// 获取级别对应的日志文本本体颜色的转义字符。
-        /// </summary>
-        internal string ToTextColor() => level switch
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void AppendLevelPrefix(LogLevel level, LoggerLevelPrefixAlignment alignment)
+    {
+        if (!_hasLevelPrefix)
         {
-            LogLevel.Trace => F.BrightBlack,
-            LogLevel.Debug => F.Magenta,
-            LogLevel.Information => C.Reset,
-            LogLevel.Warning => F.Yellow,
-            LogLevel.Error => F.Red,
-            LogLevel.Critical => $"{B.Red}{F.Black}",
-            _ => C.Reset,
-        };
+            return;
+        }
 
-        /// <summary>
-        /// 获取异常标签。
-        /// </summary>
-        internal string ToExceptionTag(LoggerConsoleFormatOptions formatOptions)
+        var levelPrefix = GetLevelPrefixText(level, alignment);
+        if (_hasColors)
         {
-            if (!formatOptions.FastHasFlag(LoggerConsoleFormatOptions.Colors))
+            _builder.Append(GetTextFormat(level));
+        }
+        _builder.Append(levelPrefix);
+        VisibleLength += levelPrefix.Length;
+        if (_hasColors)
+        {
+            _builder.Append(C.Reset);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void AppendExceptionMarker(LogLevel level)
+    {
+        var marker = GetExceptionMarkerText(level);
+        if (_hasColors)
+        {
+            _builder.Append(GetTagFormat(level));
+        }
+        _builder.Append(marker);
+        VisibleLength += marker.Length;
+        if (_hasColors)
+        {
+            _builder.Append(C.Reset);
+        }
+    }
+
+    /// <summary>
+    /// 完整创建日志字符串，并返回。此方法调用完成后，<see cref="ConsoleLogTextBuilder"/> 的状态并不会发生变化，因此可以反复调用用来创建不同的日志文本。
+    /// </summary>
+    /// <param name="level">日志级别。</param>
+    /// <param name="messages">日志字符串（可能有多段，如异常日志的消息和异常文本；每一段可能是一个多行文本）。</param>
+    /// <returns>
+    /// 完整的可直接写入到控制台的日志字符串。
+    /// <code>
+    /// [WARN] This is a multi-line
+    ///        logger message.
+    /// </code>
+    /// <code>
+    /// [WARN] message 1/2: This is a multi-line
+    ///        logger message.
+    ///        message 2/2: This is a multi-line
+    ///        logger message.
+    /// </code>
+    /// </returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public string ToLoggerString(LogLevel level, params
+#if NET6_0_OR_GREATER
+        ReadOnlySpan<string>
+#else
+        string[]
+#endif
+        messages)
+    {
+        var tagLength = VisibleLength;
+        var result = new StringBuilder(256);
+        var textColor = _hasColors ? GetTextFormat(level) : "";
+        var reset = _hasColors ? C.Reset : "";
+        var isFirstLine = true;
+
+        foreach (var message in messages)
+        {
+#if NET6_0_OR_GREATER
+            var messageSpan = message.AsSpan();
+            while (messageSpan.Length > 0)
             {
-                return level switch
+                var newlineIndex = messageSpan.IndexOf('\n');
+                ReadOnlySpan<char> line;
+
+                if (newlineIndex >= 0)
                 {
-                    LogLevel.Warning => " ! ",
-                    LogLevel.Error => " X ",
-                    LogLevel.Critical => " X ",
-                    _ => "   ",
-                };
-            }
+                    line = messageSpan[..newlineIndex];
+                    messageSpan = messageSpan[(newlineIndex + 1)..];
+                }
+                else
+                {
+                    line = messageSpan;
+                    messageSpan = ReadOnlySpan<char>.Empty;
+                }
 
-            return $"{level.ToTagColor()}{level switch
+                if (line.Length > 0 && line[^1] == '\r')
+                {
+                    line = line[..^1];
+                }
+#else
+            foreach (var rawLine in message.Split('\n'))
             {
-                LogLevel.Warning => "!",
-                LogLevel.Error => "X",
-                LogLevel.Critical => "X",
-                _ => " ",
-            }}{C.Reset}{level.ToTextColor()} ";
+                var line = rawLine.TrimEnd('\r');
+#endif
+
+                if (isFirstLine)
+                {
+                    // 首行：标签 + 空格 + 消息
+                    result.Append(_builder).Append(' ');
+                    if (!string.IsNullOrEmpty(textColor))
+                    {
+                        result.Append(textColor);
+                    }
+                    result.Append(line);
+                    if (!string.IsNullOrEmpty(reset))
+                    {
+                        result.Append(reset);
+                    }
+
+                    result.Append('\n');
+                    isFirstLine = false;
+                }
+                else
+                {
+                    // 后续行：对齐空格 + 消息
+                    result.Append(' ', tagLength + 1);
+                    if (!string.IsNullOrEmpty(textColor))
+                    {
+                        result.Append(textColor);
+                    }
+                    result.Append(line);
+                    if (!string.IsNullOrEmpty(reset))
+                    {
+                        result.Append(reset);
+                    }
+
+                    result.Append('\n');
+                }
+            }
         }
+
+        // 移除最后一个换行符
+        if (result.Length > 0 && result[^1] == '\n')
+        {
+            result.Length--;
+        }
+
+        return result.ToString();
     }
 
-    extension(LoggerConsoleFormatOptions options)
+    /// <summary>
+    /// 获取对应日志级别的级别前缀字符串（不包含颜色码）。
+    /// </summary>
+    /// <param name="level">日志级别。</param>
+    /// <param name="alignment">对齐方式。</param>
+    /// <returns>级别前缀字符串（不包含颜色码）。</returns>
+    private string GetLevelPrefixText(LogLevel level, LoggerLevelPrefixAlignment alignment) => alignment switch
     {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool FastHasFlag(LoggerConsoleFormatOptions flag)
+        LoggerLevelPrefixAlignment.Compact => level switch
         {
-            return (options & flag) == flag;
-        }
-    }
+            LogLevel.Trace /*      */ => "[TRC]",
+            LogLevel.Debug /*      */ => "[DBG]",
+            LogLevel.Information /**/ => "[INF]",
+            LogLevel.Warning /*    */ => "[WRN]",
+            LogLevel.Error /*      */ => "[ERR]",
+            LogLevel.Critical /*   */ => "[FTL]",
+            _ /*                   */ => "[   ]",
+        },
+        LoggerLevelPrefixAlignment.Short => level switch
+        {
+            LogLevel.Trace /*      */ => "[TRCE]",
+            LogLevel.Debug /*      */ => "[DBUG]",
+            LogLevel.Information /**/ => "[INFO]",
+            LogLevel.Warning /*    */ => "[WARN]",
+            LogLevel.Error /*      */ => "[ERRO]",
+            LogLevel.Critical /*   */ => "[CRIT]",
+            _ /*                   */ => "[    ]",
+        },
+        LoggerLevelPrefixAlignment.Full => level switch
+        {
+            LogLevel.Trace /*      */ => "[TRACE      ]",
+            LogLevel.Debug /*      */ => "[DEBUG      ]",
+            LogLevel.Information /**/ => "[INFORMATION]",
+            LogLevel.Warning /*    */ => "[WARNING    ]",
+            LogLevel.Error /*      */ => "[ERROR      ]",
+            LogLevel.Critical /*   */ => "[CRITICAL   ]",
+            _ /*                   */ => "[           ]",
+        },
+        _ => level switch // NoAlignment
+        {
+            LogLevel.Trace /*      */ => "[TRACE]",
+            LogLevel.Debug /*      */ => "[DEBUG]",
+            LogLevel.Information /**/ => "[INFORMATION]",
+            LogLevel.Warning /*    */ => "[WARNING]",
+            LogLevel.Error /*      */ => "[ERROR]",
+            LogLevel.Critical /*   */ => "[CRITICAL]",
+            _ /*                   */ => "[]",
+        },
+    };
+
+    /// <summary>
+    /// 获取对应日志级别的标签格式字符串转义字符。
+    /// </summary>
+    private string GetTagFormat(LogLevel level) => level switch
+    {
+        LogLevel.Trace => F.BrightBlack,
+        LogLevel.Debug => F.Magenta,
+        LogLevel.Information => $"{B.Green}{F.Black}",
+        LogLevel.Warning => $"{B.Yellow}{F.Black}",
+        LogLevel.Error => $"{B.Red}{F.Black}",
+        LogLevel.Critical => $"{B.Black}{D.Bold}{F.Red}",
+        _ => C.Reset,
+    };
+
+    /// <summary>
+    /// 获取对应日志级别的文本格式字符串转义字符。
+    /// </summary>
+    private string GetTextFormat(LogLevel level) => level switch
+    {
+        LogLevel.Trace => F.BrightBlack,
+        LogLevel.Debug => F.Magenta,
+        LogLevel.Information => "",
+        LogLevel.Warning => F.Yellow,
+        LogLevel.Error => F.Red,
+        LogLevel.Critical => $"{B.Red}{F.Black}",
+        _ => "",
+    };
+
+    /// <summary>
+    /// 获取异常标签。
+    /// </summary>
+    private string GetExceptionMarkerText(LogLevel level) => level switch
+    {
+        LogLevel.Warning => " ! ",
+        LogLevel.Error => " X ",
+        LogLevel.Critical => " X ",
+        _ => "   ",
+    };
+
+    /// <summary>
+    /// 转换为字符串。
+    /// </summary>
+    public readonly override string ToString() => _builder.ToString();
 }
 
 /// <summary>
@@ -602,26 +586,70 @@ public enum LoggerConsoleFormatOptions
 public enum LoggerLevelPrefixAlignment
 {
     /// <summary>
-    /// 不对齐（紧凑格式）。
-    /// 示例：[TRACE], [INFORMATION], [ERROR]
+    /// 不对齐。
+    /// <code>
+    /// [TRACE] = Trace
+    /// [DEBUG] = Debug
+    /// [INFORMATION] = Information
+    /// [WARNING] = Warning
+    /// [ERROR] = Error
+    /// [CRITICAL] = Critical
+    /// []
+    /// </code>
     /// </summary>
     NoAlignment,
 
     /// <summary>
-    /// 紧凑对齐（3 字符）。
-    /// 示例：[TRC], [INF], [WRN], [ERR], [FTL]
+    /// 紧凑对齐（级别缩写 3 字符，含括号共 5 字符）。
+    /// <code>
+    /// [TRC] = Trace
+    /// [DBG] = Debug
+    /// [INF] = Information
+    /// [WRN] = Warning
+    /// [ERR] = Error
+    /// [FTL] = Critical
+    /// [   ]
+    /// </code>
     /// </summary>
     Compact,
 
     /// <summary>
-    /// 短名称对齐（4 字符）。
-    /// 示例：[TRCE], [INFO], [WARN], [ERRO], [CRIT]
+    /// 短名称对齐（级别缩写 4 字符，含括号共 6 字符）。
+    /// <code>
+    /// [TRCE] = Trace
+    /// [DBUG] = Debug
+    /// [INFO] = Information
+    /// [WARN] = Warning
+    /// [ERRO] = Error
+    /// [CRIT] = Critical
+    /// [    ]
+    /// </code>
     /// </summary>
     Short,
 
     /// <summary>
-    /// 完整名称对齐（11 字符，含括号 13 字符）。
-    /// 示例：[TRACE      ], [INFORMATION], [WARNING    ], [ERROR      ], [CRITICAL   ]
+    /// 完整名称对齐（级别缩写 11 字符，含括号共 13 字符）。
+    /// <code>
+    /// [TRACE      ] = Trace
+    /// [DEBUG      ] = Debug
+    /// [INFORMATION] = Information
+    /// [WARNING    ] = Warning
+    /// [ERROR      ] = Error
+    /// [CRITICAL   ] = Critical
+    /// [           ]
+    /// </code>
     /// </summary>
     Full,
+}
+
+file static class Extensions
+{
+    extension(LoggerConsoleFormatOptions options)
+    {
+        /// <summary>
+        /// 快速检查是否包含指定的标志位。
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal bool FastHasFlag(LoggerConsoleFormatOptions flag) => (options & flag) == flag;
+    }
 }
