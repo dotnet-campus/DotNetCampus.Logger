@@ -189,7 +189,9 @@ public class ConsoleLoggerFormatOptionsTests
         var builder = new ConsoleLoggerBuilder();
 
         // Act
-        builder.WithStdioRedirectedFormat();
+        builder
+            .WithFormat(LoggerConsoleFormatOptions.StdioRedirected, LoggerLevelPrefixAlignment.Short)
+            .WithOutput(LoggerConsoleOutputTo.StandardError);
         var consoleLogger = builder.Build();
 
         // Assert
@@ -205,7 +207,7 @@ public class ConsoleLoggerFormatOptionsTests
         var builder = new ConsoleLoggerBuilder();
 
         // Act
-        builder.WithColorfulConsoleFormat();
+        builder.WithFormat(LoggerConsoleFormatOptions.ColorfulConsole, LoggerLevelPrefixAlignment.NoAlignment);
         var consoleLogger = builder.Build();
 
         // Assert
@@ -235,8 +237,7 @@ public class ConsoleLoggerFormatOptionsTests
     {
         return new LoggerBuilder()
             .AddConsoleLogger(b => b
-                .WithFormat(formatOptions)
-                .WithLevelPrefixAlignment(alignment)
+                .WithFormat(formatOptions, alignment)
                 .WithThreadSafe(LogWritingThreadMode.NotThreadSafe))
             .Build()
             .Logger;
